@@ -1,5 +1,6 @@
 shadowsocks
 ===========
+shadowsocksR mu forked from breakwa11/shadowsocks
 
 [![PyPI version]][PyPI]
 [![Build Status]][Travis CI]
