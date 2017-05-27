@@ -81,6 +81,10 @@ class TransferBase(object):
         new_servers = {}
         allow_users = {}
         for row in rows:
+            row['u'] = str(row['u'])
+            row['passwd'] = str(row['passwd'])
+            row['port'] = str(row['port'])
+            # 不转化为字符串 gg
 
             passwd = common.to_bytes(row['passwd'])
             if hasattr(passwd, 'encode'):
