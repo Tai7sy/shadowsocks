@@ -31,7 +31,7 @@ from shadowsocks import common
 from shadowsocks import lru_cache
 from shadowsocks import eventloop
 import server_pool
-import Config
+import api_config
 import urllib2
 
 
@@ -61,7 +61,7 @@ class ServerMgr(object):
         # TODO when dns server is IPv6
         try:
             self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.SOL_UDP)
-            self._sock.bind((Config.MANAGE_BIND_IP, Config.MANAGE_PORT))
+            self._sock.bind((api_config.MANAGE_BIND_IP, api_config.MANAGE_PORT))
             self._sock.setblocking(False)
             loop.add(self._sock, eventloop.POLL_IN, self)
         except Exception as e:
@@ -73,17 +73,17 @@ class ServerMgr(object):
         args = data.split(':')
         if len(args) < 4:
             return
-        if args[0] == Config.MANAGE_PASS:
+        if args[0] == api_config.MANAGE_PASS:
             if args[4] == 'del':
                 server_pool.ServerPool.get_instance().cb_del_server(args[2])
             elif args[4] == 'new':
                 newport = getFreePort()
                 if server_pool.ServerPool.get_instance().new_server(newport, args[3]):
-                    newuseru = "http://%s%snewuser.php?sk=%s&p=%d&u=%s" % (Config.API_HOST, Config.API_PATH, Config.API_TOKEN, newport, args[1])
+                    newuseru = "http://%s%snewuser.php?sk=%s&p=%d&u=%s" % (api_config.API_HOST, api_config.API_PATH, api_config.API_TOKEN, newport, args[1])
                     print newuseru
                     urllib2.urlopen(newuseru)
                 else:
-                    newuseru = "http://%s%snewuser.php?sk=%s&p=-1&u=%s" % (Config.API_HOST, Config.API_PATH, Config.API_TOKEN, args[1])
+                    newuseru = "http://%s%snewuser.php?sk=%s&p=-1&u=%s" % (api_config.API_HOST, api_config.API_PATH, api_config.API_TOKEN, args[1])
                     print newuseru
                     urllib2.urlopen(newuseru)
 
@@ -91,9 +91,9 @@ class ServerMgr(object):
                 server_pool.ServerPool.get_instance().cb_del_server(args[2])
                 newport = getFreePort()
                 if server_pool.ServerPool.get_instance().new_server(newport, args[3]):
-                    urllib2.urlopen("http://%s%snewuser.php?sk=%s&p=%d&u=%s" % (Config.API_HOST, Config.API_PATH, Config.API_TOKEN, newport, args[1]))
+                    urllib2.urlopen("http://%s%snewuser.php?sk=%s&p=%d&u=%s" % (api_config.API_HOST, api_config.API_PATH, api_config.API_TOKEN, newport, args[1]))
                 else:
-                    urllib2.urlopen("http://%s%snewuser.php?sk=%s&p=-1&u=%s" % (Config.API_HOST, Config.API_PATH, Config.API_TOKEN, args[1]))
+                    urllib2.urlopen("http://%s%snewuser.php?sk=%s&p=-1&u=%s" % (api_config.API_HOST, api_config.API_PATH, api_config.API_TOKEN, args[1]))
 
     def handle_event(self, sock, fd, event):
         if sock != self._sock:

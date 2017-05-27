@@ -322,11 +322,8 @@ class DNSResolver(object):
             except IOError:
                 pass
         if not self._servers:
-<<<<<<< HEAD
             self._servers = [('8.8.4.4', 53), ('119.29.29.29', 53)]
-=======
-            self._servers = [('8.8.4.4', 53), ('8.8.8.8', 53)]
->>>>>>> c1364c3afef69da369d3b9dcc1d5638f9ec18eac
+
         logging.info('dns server: %s' % (self._servers,))
 
     def _parse_hosts(self):
