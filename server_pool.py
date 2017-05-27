@@ -55,7 +55,7 @@ class ServerPool(object):
 		if not self.config.get('dns_ipv6', False):
 			asyncdns.IPV6_CONNECTION_SUPPORT = False
 
-		self.mgr = None #asyncmgr.ServerMgr()
+		self.mgr = asyncmgr.ServerMgr()
 
 		self.tcp_servers_pool = {}
 		self.tcp_ipv6_servers_pool = {}
@@ -118,8 +118,8 @@ class ServerPool(object):
 
 		if 'server_ipv6' in self.config:
 			if port in self.tcp_ipv6_servers_pool:
-				logging.info("server already at %s:%d" % (self.config['server_ipv6'], port))
-				return 'this port server is already running'
+				logging.info("server V6 already at %s:%d" % (self.config['server_ipv6'], port))
+				return 'this port server V6 is already running'
 			else:
 				a_config = self.config.copy()
 				if len(a_config['server_ipv6']) > 2 and a_config['server_ipv6'][0] == "[" and a_config['server_ipv6'][-1] == "]":
@@ -128,7 +128,7 @@ class ServerPool(object):
 				a_config['server_port'] = port
 				a_config['password'] = password
 				try:
-					logging.info("starting server at [%s]:%d" % (a_config['server'], port))
+					logging.info("starting server V6 at [%s]:%d" % (a_config['server'], port))
 
 					tcp_server = tcprelay.TCPRelay(a_config, self.dns_resolver, False, stat_counter=self.stat_counter)
 					tcp_server.add_to_loop(self.loop)
@@ -145,14 +145,14 @@ class ServerPool(object):
 
 		if 'server' in self.config:
 			if port in self.tcp_servers_pool:
-				logging.info("server already at %s:%d" % (self.config['server'], port))
-				return 'this port server is already running'
+				logging.info("server V4 already at %s:%d" % (self.config['server'], port))
+				return 'this port server V4 is already running'
 			else:
 				a_config = self.config.copy()
 				a_config['server_port'] = port
 				a_config['password'] = password
 				try:
-					logging.info("starting server at %s:%d" % (a_config['server'], port))
+					logging.info("starting server V4 at %s:%d" % (a_config['server'], port))
 
 					tcp_server = tcprelay.TCPRelay(a_config, self.dns_resolver, False)
 					tcp_server.add_to_loop(self.loop)
@@ -216,23 +216,29 @@ class ServerPool(object):
 		return True
 
 	def get_server_transfer(self, port):
+		logging.info('get_server_transfer : port:%d' % port);
 		port = int(port)
 		ret = [0, 0]
 		if port in self.tcp_servers_pool:
+			print 'tcp_servers_pool up:%d down:%d\n ' % (self.tcp_servers_pool[port].server_transfer_ul, self.tcp_servers_pool[port].server_transfer_dl)
 			ret[0] = self.tcp_servers_pool[port].server_transfer_ul
 			ret[1] = self.tcp_servers_pool[port].server_transfer_dl
 		if port in self.udp_servers_pool:
+			print 'udp_servers_pool up:%d down:%d\n ' % (self.udp_servers_pool[port].server_transfer_ul, self.udp_servers_pool[port].server_transfer_dl)
 			ret[0] += self.udp_servers_pool[port].server_transfer_ul
 			ret[1] += self.udp_servers_pool[port].server_transfer_dl
 		if port in self.tcp_ipv6_servers_pool:
+#			print 'tcp_ipv6_servers_pool up:%d down:%d\n ' % (self.tcp_ipv6_servers_pool[port].server_transfer_ul, self.tcp_ipv6_servers_pool[port].server_transfer_dl)
 			ret[0] += self.tcp_ipv6_servers_pool[port].server_transfer_ul
 			ret[1] += self.tcp_ipv6_servers_pool[port].server_transfer_dl
 		if port in self.udp_ipv6_servers_pool:
+#			print 'udp_ipv6_servers_pool up:%d down:%d\n ' % (self.udp_ipv6_servers_pool[port].server_transfer_ul, self.udp_ipv6_servers_pool[port].server_transfer_dl)
 			ret[0] += self.udp_ipv6_servers_pool[port].server_transfer_ul
 			ret[1] += self.udp_ipv6_servers_pool[port].server_transfer_dl
 		return ret
 
 	def get_servers_transfer(self):
+#		logging.info('get_servers_transfer');
 		servers = self.tcp_servers_pool.copy()
 		servers.update(self.tcp_ipv6_servers_pool)
 		servers.update(self.udp_servers_pool)

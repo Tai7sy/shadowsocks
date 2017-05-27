@@ -85,7 +85,7 @@ def inet_pton(family, addr):
         if '.' in addr:  # a v4 addr
             v4addr = addr[addr.rindex(':') + 1:]
             v4addr = socket.inet_aton(v4addr)
-            v4addr = map(lambda x: ('%02X' % ord(x)), v4addr)
+            v4addr = ['%02X' % ord(x) for x in v4addr]
             v4addr.insert(2, ':')
             newaddr = addr[:addr.rindex(':') + 1] + ''.join(v4addr)
             return inet_pton(family, newaddr)
@@ -150,6 +150,8 @@ def pack_addr(address):
     return b'\x03' + chr(len(address)) + address
 
 def pre_parse_header(data):
+    if not data:
+        return None
     datatype = ord(data[0])
     if datatype == 0x80:
         if len(data) <= 2:
@@ -233,6 +235,7 @@ class IPNetwork(object):
     ADDRLENGTH = {socket.AF_INET: 32, socket.AF_INET6: 128, False: 0}
 
     def __init__(self, addrs):
+        self.addrs_str = addrs
         self._network_list_v4 = []
         self._network_list_v6 = []
         if type(addrs) == str:
@@ -283,6 +286,39 @@ class IPNetwork(object):
         else:
             return False
 
+    def __cmp__(self, other):
+        return cmp(self.addrs_str, other.addrs_str)
+
+class PortRange(object):
+    def __init__(self, range_str):
+        self.range_str = to_str(range_str)
+        self.range = set()
+        range_str = to_str(range_str).split(',')
+        for item in range_str:
+            try:
+                int_range = item.split('-')
+                if len(int_range) == 1:
+                    if item:
+                        self.range.add(int(item))
+                elif len(int_range) == 2:
+                    int_range[0] = int(int_range[0])
+                    int_range[1] = int(int_range[1])
+                    if int_range[0] < 0:
+                        int_range[0] = 0
+                    if int_range[1] > 65535:
+                        int_range[1] = 65535
+                    i = int_range[0]
+                    while i <= int_range[1]:
+                        self.range.add(i)
+                        i += 1
+            except Exception as e:
+                logging.error(e)
+
+    def __contains__(self, val):
+        return val in self.range
+
+    def __cmp__(self, other):
+        return cmp(self.range_str, other.range_str)
 
 def test_inet_conv():
     ipv4 = b'8.8.4.4'

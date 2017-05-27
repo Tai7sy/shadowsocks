@@ -160,6 +160,10 @@ class TCPRelayHandler(object):
             self._forbidden_iplist = config['forbidden_ip']
         else:
             self._forbidden_iplist = None
+        if 'forbidden_port' in config:
+            self._forbidden_portset = config['forbidden_port']
+        else:
+            self._forbidden_portset = None
         if is_local:
             self._chosen_server = self._get_a_server()
         fd_to_handlers[local_sock.fileno()] = self
@@ -360,7 +364,7 @@ class TCPRelayHandler(object):
         return (host_post, 80)
 
     def _handel_protocol_error(self, client_address, ogn_data):
-        logging.warn("Protocol ERROR, TCP ogn data %s from %s:%d" % (binascii.hexlify(ogn_data), client_address[0], client_address[1]))
+        logging.warn("Protocol ERROR, TCP ogn data %s from %s:%d via port %d" % (binascii.hexlify(ogn_data), client_address[0], client_address[1], self._server._listen_port))
         self._encrypt_correct = False
         #create redirect or disconnect by hash code
         host, port = self._get_redirect_host(client_address, ogn_data)
@@ -511,10 +515,20 @@ class TCPRelayHandler(object):
         if len(addrs) == 0:
             raise Exception("getaddrinfo failed for %s:%d" % (ip, port))
         af, socktype, proto, canonname, sa = addrs[0]
-        if not self._remote_udp and self._forbidden_iplist:
-            if common.to_str(sa[0]) in self._forbidden_iplist:
-                raise Exception('IP %s is in forbidden list, reject' %
-                                common.to_str(sa[0]))
+        if not self._remote_udp:
+            if self._forbidden_iplist:
+                if common.to_str(sa[0]) in self._forbidden_iplist:
+                    if self._remote_address:
+                        raise Exception('IP %s is in forbidden list, when connect to %s:%d via port %d' %
+                            (common.to_str(sa[0]), self._remote_address[0], self._remote_address[1], self._server._listen_port))
+                    raise Exception('IP %s is in forbidden list, reject' %
+                                    common.to_str(sa[0]))
+            if self._forbidden_portset:
+                if sa[1] in self._forbidden_portset:
+                    if self._remote_address:
+                        raise Exception('Port %d is in forbidden list, when connect to %s:%d via port %d' %
+                            (sa[1], self._remote_address[0], self._remote_address[1], self._server._listen_port))
+                    raise Exception('Port %d is in forbidden list, reject' % sa[1])
         remote_sock = socket.socket(af, socktype, proto)
         self._remote_sock = remote_sock
         self._fd_to_handlers[remote_sock.fileno()] = self
@@ -652,7 +666,20 @@ class TCPRelayHandler(object):
                     else:
                         data = obfs_decode[0]
                     try:
-                        data = self._protocol.server_post_decrypt(data)
+                        data, sendback = self._protocol.server_post_decrypt(data)
+                        if sendback:
+                            backdata = self._protocol.server_pre_encrypt(b'')
+                            backdata = self._encryptor.encrypt(backdata)
+                            backdata = self._obfs.server_encode(backdata)
+                            try:
+                                self._write_to_sock(backdata, self._local_sock)
+                            except Exception as e:
+                                shell.print_exception(e)
+                                if self._config['verbose']:
+                                    traceback.print_exc()
+                                logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
+                                self.destroy()
+                                return
                     except Exception as e:
                         shell.print_exception(e)
                         logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
@@ -971,14 +998,11 @@ class TCPRelay(object):
                 self._stat_counter[self._listen_port] = {}
             newval = self._stat_counter[self._listen_port].get(local_addr, 0) + val
             logging.debug('port %d addr %s connections %d' % (self._listen_port, local_addr, newval))
+            self._stat_counter[self._listen_port][local_addr] = newval
+            self.update_stat(self._listen_port, self._stat_counter[self._listen_port], val)
             if newval <= 0:
                 if local_addr in self._stat_counter[self._listen_port]:
                     del self._stat_counter[self._listen_port][local_addr]
-                if len(self._stat_counter[self._listen_port]) == 0:
-                    del self._stat_counter[self._listen_port]
-            else:
-                self._stat_counter[self._listen_port][local_addr] = newval
-                self.update_stat(self._listen_port, self._stat_counter[self._listen_port], val)
 
             newval = self._stat_counter.get(0, 0) + val
             self._stat_counter[0] = newval

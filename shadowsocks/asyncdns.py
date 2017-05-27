@@ -76,6 +76,8 @@ QTYPE_AAAA = 28
 QTYPE_CNAME = 5
 QTYPE_NS = 2
 QCLASS_IN = 1
+DIRECTRESOLV = False # 如果'NoneType' object has no attribute 'sendto' when handling connection from 就开启此选项
+
 
 def detect_ipv6_supprot():
     if 'has_ipv6' in dir(socket):
@@ -284,23 +286,44 @@ class DNSResolver(object):
     def _parse_resolv(self):
         self._servers = []
         try:
-            with open('/etc/resolv.conf', 'rb') as f:
+            with open('dns.conf', 'rb') as f:
                 content = f.readlines()
                 for line in content:
                     line = line.strip()
                     if line:
-                        if line.startswith(b'nameserver'):
-                            parts = line.split()
-                            if len(parts) >= 2:
-                                server = parts[1]
-                                if common.is_ip(server) == socket.AF_INET:
-                                    if type(server) != str:
-                                        server = server.decode('utf8')
-                                    self._servers.append(server)
+                        parts = line.split(b' ', 1)
+                        if len(parts) >= 2:
+                            server = parts[0]
+                            port = int(parts[1])
+                        else:
+                            server = parts[0]
+                            port = 53
+                        if common.is_ip(server) == socket.AF_INET:
+                            if type(server) != str:
+                                server = server.decode('utf8')
+                            self._servers.append((server, port))
         except IOError:
             pass
         if not self._servers:
-            self._servers = ['8.8.4.4', '8.8.8.8']
+            try:
+                with open('/etc/resolv.conf', 'rb') as f:
+                    content = f.readlines()
+                    for line in content:
+                        line = line.strip()
+                        if line:
+                            if line.startswith(b'nameserver'):
+                                parts = line.split()
+                                if len(parts) >= 2:
+                                    server = parts[1]
+                                    if common.is_ip(server) == socket.AF_INET:
+                                        if type(server) != str:
+                                            server = server.decode('utf8')
+                                        self._servers.append((server, 53))
+            except IOError:
+                pass
+        if not self._servers:
+            self._servers = [('8.8.4.4', 53), ('119.29.29.29', 53)]
+        logging.info('dns server: %s' % (self._servers,))
 
     def _parse_hosts(self):
         etc_path = '/etc/hosts'
@@ -326,8 +349,7 @@ class DNSResolver(object):
             raise Exception('already add to loop')
         self._loop = loop
         # TODO when dns server is IPv6
-        self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM,
-                                   socket.SOL_UDP)
+        self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM,socket.SOL_UDP)
         self._sock.setblocking(False)
         loop.add(self._sock, eventloop.POLL_IN, self)
         loop.add_periodic(self.handle_periodic)
@@ -400,7 +422,7 @@ class DNSResolver(object):
             self._loop.add(self._sock, eventloop.POLL_IN, self)
         else:
             data, addr = sock.recvfrom(1024)
-            if addr[0] not in self._servers:
+            if addr not in self._servers:
                 logging.warn('received a packet other than our dns')
                 return
             self._handle_data(data)
@@ -425,7 +447,7 @@ class DNSResolver(object):
         for server in self._servers:
             logging.debug('resolving %s with type %d using server %s',
                           hostname, qtype, server)
-            self._sock.sendto(req, (server, 53))
+            self._sock.sendto(req, server)
 
     def resolve(self, hostname, callback):
         if type(hostname) != bytes:
@@ -446,7 +468,7 @@ class DNSResolver(object):
             if not is_valid_hostname(hostname):
                 callback(None, Exception('invalid hostname: %s' % hostname))
                 return
-            if False:
+            if DIRECTRESOLV:#防止这个傻逼dns解析函数有BUG
                 addrs = socket.getaddrinfo(hostname, 0, 0,
                                        socket.SOCK_DGRAM, socket.SOL_UDP)
                 if addrs:
