@@ -35,3 +35,5 @@ htmlcov
 user-config.json
 userapiconfig.py
 usermysql.json
+
+user_api_config.py
