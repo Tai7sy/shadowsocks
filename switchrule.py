@@ -1,6 +1,6 @@
-def getKeys():
-	return ['port', 'u', 'd', 'transfer_enable', 'passwd', 'enable' ]
-	#return ['port', 'u', 'd', 'transfer_enable', 'passwd', 'enable', 'plan' ] # append the column name 'plan'
+def getKeys(key_list):
+	return key_list
+	#return key_list + ['plan'] # append the column name 'plan'
 
 def isTurnOn(row):
 	return True

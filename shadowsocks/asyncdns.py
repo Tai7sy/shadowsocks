@@ -322,7 +322,11 @@ class DNSResolver(object):
             except IOError:
                 pass
         if not self._servers:
+<<<<<<< HEAD
             self._servers = [('8.8.4.4', 53), ('119.29.29.29', 53)]
+=======
+            self._servers = [('8.8.4.4', 53), ('8.8.8.8', 53)]
+>>>>>>> c1364c3afef69da369d3b9dcc1d5638f9ec18eac
         logging.info('dns server: %s' % (self._servers,))
 
     def _parse_hosts(self):
@@ -333,6 +337,8 @@ class DNSResolver(object):
             with open(etc_path, 'rb') as f:
                 for line in f.readlines():
                     line = line.strip()
+                    if b"#" in line:
+                        line = line[:line.find(b'#')]
                     parts = line.split()
                     if len(parts) >= 2:
                         ip = parts[0]
@@ -363,7 +369,7 @@ class DNSResolver(object):
                 callback((hostname, ip), error)
             else:
                 callback((hostname, None),
-                         Exception('unknown hostname %s' % hostname))
+                         Exception('unable to parse hostname %s' % hostname))
         if hostname in self._hostname_to_cb:
             del self._hostname_to_cb[hostname]
         if hostname in self._hostname_status:
