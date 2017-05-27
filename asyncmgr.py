@@ -34,92 +34,93 @@ import server_pool
 import Config
 import urllib2
 
+
 def getFreePort():
-  allport=os.popen('netstat -na').read()
-  for i in range(10000,60000):
-	if(str(i) not in allport):
-	  return i
+    allport = os.popen('netstat -na').read()
+    for i in range(10000, 60000):
+        if str(i) not in allport:
+            return i
+
 
 class ServerMgr(object):
+    def __init__(self):
+        self._loop = None
+        self._request_id = 1
+        self._hosts = {}
+        self._hostname_status = {}
+        self._hostname_to_cb = {}
+        self._cb_to_hostname = {}
+        self._last_time = time.time()
+        self._sock = None
+        self._servers = None
 
-	def __init__(self):
-		self._loop = None
-		self._request_id = 1
-		self._hosts = {}
-		self._hostname_status = {}
-		self._hostname_to_cb = {}
-		self._cb_to_hostname = {}
-		self._last_time = time.time()
-		self._sock = None
-		self._servers = None
+    def add_to_loop(self, loop):
+        if self._loop:
+            raise Exception('already add to loop')
+        self._loop = loop
+        # TODO when dns server is IPv6
+        try:
+            self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.SOL_UDP)
+            self._sock.bind((Config.MANAGE_BIND_IP, Config.MANAGE_PORT))
+            self._sock.setblocking(False)
+            loop.add(self._sock, eventloop.POLL_IN, self)
+        except Exception as e:
+            logging.error('\n\nServerMgr Start Error %s \n\n' % e)
 
-	def add_to_loop(self, loop):
-		if self._loop:
-			raise Exception('already add to loop')
-		self._loop = loop
-		# TODO when dns server is IPv6
-		try:
-			self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM,socket.SOL_UDP)
-			self._sock.bind((Config.MANAGE_BIND_IP, Config.MANAGE_PORT))
-			self._sock.setblocking(False)
-			loop.add(self._sock, eventloop.POLL_IN, self)
-		except Exception as e:
-			logging.error('\n\nServerMgr Start Error %s \n\n' % e)
+    def _handle_data(self, sock):
+        data, addr = sock.recvfrom(128)
+        # manage managepass:UID:port:passwd:action
+        args = data.split(':')
+        if len(args) < 4:
+            return
+        if args[0] == Config.MANAGE_PASS:
+            if args[4] == 'del':
+                server_pool.ServerPool.get_instance().cb_del_server(args[2])
+            elif args[4] == 'new':
+                newport = getFreePort()
+                if server_pool.ServerPool.get_instance().new_server(newport, args[3]):
+                    newuseru = "http://%s%snewuser.php?sk=%s&p=%d&u=%s" % (Config.API_HOST, Config.API_PATH, Config.API_TOKEN, newport, args[1])
+                    print newuseru
+                    urllib2.urlopen(newuseru)
+                else:
+                    newuseru = "http://%s%snewuser.php?sk=%s&p=-1&u=%s" % (Config.API_HOST, Config.API_PATH, Config.API_TOKEN, args[1])
+                    print newuseru
+                    urllib2.urlopen(newuseru)
 
+            elif args[4] == 'edit':
+                server_pool.ServerPool.get_instance().cb_del_server(args[2])
+                newport = getFreePort()
+                if server_pool.ServerPool.get_instance().new_server(newport, args[3]):
+                    urllib2.urlopen("http://%s%snewuser.php?sk=%s&p=%d&u=%s" % (Config.API_HOST, Config.API_PATH, Config.API_TOKEN, newport, args[1]))
+                else:
+                    urllib2.urlopen("http://%s%snewuser.php?sk=%s&p=-1&u=%s" % (Config.API_HOST, Config.API_PATH, Config.API_TOKEN, args[1]))
 
-	def _handle_data(self, sock):
-		data, addr = sock.recvfrom(128)
-		#manage managepass:UID:port:passwd:action
-		args = data.split(':')
-		if len(args) < 4:
-			return
-		if args[0] == Config.MANAGE_PASS:
-			if args[4] == 'del':
-				server_pool.ServerPool.get_instance().cb_del_server(args[2])
-			elif args[4] == 'new':
-				newport=getFreePort()
-				if server_pool.ServerPool.get_instance().new_server(newport, args[3]):
-					newuseru = "http://%s%snewuser.php?sk=%s&p=%d&u=%s" % (Config.API_HOST,Config.API_PATH,Config.API_TOKEN,newport,args[1])
-					print newuseru
-					urllib2.urlopen(newuseru)
-				else:
-					newuseru = "http://%s%snewuser.php?sk=%s&p=-1&u=%s" % (Config.API_HOST,Config.API_PATH,Config.API_TOKEN,args[1])
-					print newuseru
-					urllib2.urlopen(newuseru)
+    def handle_event(self, sock, fd, event):
+        if sock != self._sock:
+            return
+        if event & eventloop.POLL_ERR:
+            logging.error('mgr socket err')
+            self._loop.remove(self._sock)
+            self._sock.close()
+            # TODO when dns server is IPv6
+            self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM,
+                                       socket.SOL_UDP)
+            self._sock.setblocking(False)
+            self._loop.add(self._sock, eventloop.POLL_IN, self)
+        else:
+            self._handle_data(sock)
 
-			elif args[4] == 'edit':
-				server_pool.ServerPool.get_instance().cb_del_server(args[2])
-				newport=getFreePort()
-				if server_pool.ServerPool.get_instance().new_server(newport, args[3]):
-					urllib2.urlopen("http://%s%snewuser.php?sk=%s&p=%d&u=%s" % (Config.API_HOST,Config.API_PATH,Config.API_TOKEN,newport,args[1]))
-				else:
-					urllib2.urlopen("http://%s%snewuser.php?sk=%s&p=-1&u=%s" % (Config.API_HOST,Config.API_PATH,Config.API_TOKEN,args[1]))
-
-	def handle_event(self, sock, fd, event):
-		if sock != self._sock:
-			return
-		if event & eventloop.POLL_ERR:
-			logging.error('mgr socket err')
-			self._loop.remove(self._sock)
-			self._sock.close()
-			# TODO when dns server is IPv6
-			self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM,
-									   socket.SOL_UDP)
-			self._sock.setblocking(False)
-			self._loop.add(self._sock, eventloop.POLL_IN, self)
-		else:
-			self._handle_data(sock)
-
-	def close(self):
-		if self._sock:
-			if self._loop:
-				self._loop.remove(self._sock)
-			self._sock.close()
-			self._sock = None
+    def close(self):
+        if self._sock:
+            if self._loop:
+                self._loop.remove(self._sock)
+            self._sock.close()
+            self._sock = None
 
 
 def test():
-	pass
+    pass
+
 
 if __name__ == '__main__':
-	test()
+    test()
