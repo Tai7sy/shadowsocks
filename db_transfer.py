@@ -235,7 +235,7 @@ class TransferBase(object):
                     trace = traceback.format_exc()
                     logging.error(trace)
                     #logging.warn('db thread except:%s' % e)
-                if db_instance.event.wait(get_config().UPDATE_TIME) or not ServerPool.get_instance().thread.is_alive():
+                if db_instance.event.wait(get_config().API_UPDATE_TIME) or not ServerPool.get_instance().thread.is_alive():
                     break
         except KeyboardInterrupt as e:
             pass
@@ -298,7 +298,7 @@ class DbTransfer(TransferBase):
         return update_transfer
 
     def pull_db_all_user(self):
-        print '获取数据库所有用户信息\n'
+        print '\n获取数据库所有用户信息'
         print "http://%s%spulluser.php?sk=%s" % (get_config().API_HOST, get_config().API_PATH, get_config().API_TOKEN)
         try:
             user_list = json.loads(urllib2.urlopen("http://%s%spulluser.php?sk=%s" % (get_config().API_HOST, get_config().API_PATH, get_config().API_TOKEN)).read())
