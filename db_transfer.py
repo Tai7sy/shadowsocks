@@ -81,9 +81,9 @@ class TransferBase(object):
         new_servers = {}
         allow_users = {}
         for row in rows:
-            row['u'] = str(row['u'])
+            row['u'] = int(row['u'])
             row['passwd'] = str(row['passwd'])
-            row['port'] = str(row['port'])
+            row['port'] = int(row['port'])
             # 不转化为字符串 gg
 
             passwd = common.to_bytes(row['passwd'])
@@ -112,7 +112,7 @@ class TransferBase(object):
                 else:
                     newport = func.get_free_port()
                 print '\n\nNew Server/1: %s ' % row['port']
-                row['port'] = '%d' % newport
+                row['port'] = newport
                 self.new_server(newport, passwd, cfg)
 
                 new_user_url = "http://%s%snewuser.php?sk=%s&p=%d&u=%s" % (get_config().API_HOST, get_config().API_PATH, get_config().API_TOKEN, newport, row['u'])
@@ -120,9 +120,9 @@ class TransferBase(object):
                 urllib2.urlopen(new_user_url)
 
 
-            port = row['port']
+            port = int(row['port'])
             if 'u' in row: #uid 与 port 映射
-                self.port_uid_table[row['port']] = row['u']
+                self.port_uid_table[port] = row['u']
             if port not in cur_servers:
                 cur_servers[port] = passwd
             else:
@@ -156,14 +156,14 @@ class TransferBase(object):
                 self.new_server(port, passwd, cfg)
 
         for row in last_rows:
-            if row['port'] in cur_servers:
+            if port in cur_servers:
                 pass
             else:
-                logging.info('db stop server at port [%s] reason: port not exist' % (row['port']))
-                ServerPool.get_instance().cb_del_server(row['port'])
-                self.clear_cache(row['port'])
-                if row['port'] in self.port_uid_table:
-                    del self.port_uid_table[row['port']]
+                logging.info('db stop server at port [%s] reason: port not exist' % port)
+                ServerPool.get_instance().cb_del_server(port)
+                self.clear_cache(port)
+                if port in self.port_uid_table:
+                    del self.port_uid_table[port]
 
         if len(new_servers) > 0:
             from shadowsocks import eventloop
