@@ -268,16 +268,16 @@ class DbTransfer(TransferBase):
             update_trs = 1024 * (2048 - self.user_pass.get(id, 0) * 64)
             if transfer[0] + transfer[1] < update_trs and id not in self.force_update_transfer:
                 self.user_pass[id] = self.user_pass.get(id, 0) + 1
-                print 'Port: %d  upload: %d  download: %d  Rate: %f#1 , too less wait for next' % (id, transfer[id][0], transfer[id][1], get_config().NOWSER_TRANSFER_MUL)
+                print 'Port: %d  upload: %d  download: %d  Rate: %f#1 , too less wait for next' % (id, transfer[0], transfer[1], get_config().NOWSER_TRANSFER_MUL)
                 continue
             if id in self.user_pass:
                 del self.user_pass[id]
 
-            server_trans_all += transfer[id][0] + transfer[id][1]
-            update_transfer[id] = [int(transfer[id][0] * get_config().NOW_SER_TRANSFER_MUL),
-                                   int(transfer[id][1] * get_config().NOW_SER_TRANSFER_MUL)]
+            server_trans_all += transfer[0] + transfer[1]
+            update_transfer[id] = [int(transfer[0] * get_config().NOW_SER_TRANSFER_MUL),
+                                   int(transfer[1] * get_config().NOW_SER_TRANSFER_MUL)]
 
-            print 'Port: %d  upload: %d  download: %d  Rate: %f#1' % (id,transfer[id][0],transfer[id][1],get_config().NOWSER_TRANSFER_MUL)
+            print 'Port: %d  upload: %d  download: %d  Rate: %f#1' % (id,transfer[0],transfer[1],get_config().NOWSER_TRANSFER_MUL)
 
         update_server = "http://%s%supdateserver.php?sk=%s&flow=%d&count=%d&net=%s" % (get_config().API_HOST, get_config().API_PATH, get_config().API_TOKEN, (server_trans_all + 1) / 1024, online_count, func.get_speed(get_config().NETNAME))
         print update_server
